@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Exam Challenger - Admin Pro</title>
+    
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+
+    <style>
+        /* --- DARK THEME --- */
+        body { margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; background-color: #050505; color: #fff; min-height: 100vh; display: flex; justify-content: center; align-items: center; }
+        .container { background: #1a1a1a; padding: 30px; border-radius: 20px; width: 90%; max-width: 850px; border: 1px solid #333; text-align: center; box-shadow: 0 0 20px rgba(0,0,0,0.5); position: relative; }
+        
+        h1, h2 { color: #00e676; margin-top: 0; }
+        .hidden { display: none !important; }
+
+        input, select, textarea { width: 100%; padding: 12px; margin: 10px 0; background: #2a2a2a; border: 1px solid #444; color: white; border-radius: 8px; box-sizing: border-box; font-size: 1rem; }
+        .btn { width: 100%; padding: 14px; background: #00e676; color: black; border: none; font-weight: bold; cursor: pointer; border-radius: 8px; margin-top: 15px; font-size: 1rem; transition: 0.2s; }
+        .btn:hover { transform: scale(1.02); }
+        .btn-sec { background: #333; color: #ccc; }
+        .btn-red { background: #ff5252; color: white; }
+
+        /* TABS */
+        .tab-container { display: flex; gap: 10px; margin-bottom: 20px; }
+        .btn-tab { flex: 1; background: #333; color: #aaa; border: 1px solid #444; padding: 12px; border-radius: 8px; cursor: pointer; }
+        .btn-tab.active { background: #00e676; color: black; border-color: #00e676; font-weight: bold; }
+
+        /* EXAM CARDS */
+        .exam-card { background: #252525; padding: 15px; margin-bottom: 10px; border-radius: 10px; border-left: 5px solid #444; text-align: left; display: flex; justify-content: space-between; align-items: center; position: relative; }
+        .exam-card small { font-size: 0.7em; padding: 2px 6px; border-radius: 4px; margin-right: 10px; }
+        .tag-pyq { background: #ffab00; color: black; }
+        .tag-chp { background: #00e676; color: black; }
+
+        /* THREE DOTS MENU */
+        .menu-btn { background: none; border: none; color: white; font-size: 1.5em; cursor: pointer; padding: 0 10px; }
+        .menu-dropdown { 
+            display: none; position: absolute; right: 10px; top: 40px; 
+            background: #333; border: 1px solid #555; border-radius: 8px; 
+            z-index: 100; box-shadow: 0 5px 15px rgba(0,0,0,0.5); width: 160px;
+        }
+        .menu-item { padding: 12px; cursor: pointer; text-align: left; font-size: 0.9em; border-bottom: 1px solid #444; }
+        .menu-item:hover { background: #444; }
+        .menu-item:last-child { border-bottom: none; color: #ff5252; }
+
+        /* QUESTION MANAGER (Single Q Delete) */
+        .q-item { background: #222; padding: 15px; margin-bottom: 8px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; text-align: left; border: 1px solid #333; }
+        .q-text { width: 85%; font-size: 0.9em; color: #ddd; }
+        .q-del { background: #ff5252; color: white; border: none; width: 30px; height: 30px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+
+        /* QUIZ UI */
+        .option { padding: 15px; background: #2a2a2a; border: 1px solid #444; margin-bottom: 10px; cursor: pointer; border-radius: 8px; text-align: left; }
+        .option.selected { background: #00e676; color: black; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<div class="container" onclick="closeAllMenus()">
+
+    <div id="screen-auth">
+        <h1>🚀 Exam Challenger</h1>
+        <p>Login to Access</p>
+        <input type="email" id="email" value="hrishikeshyadav990@gmail.com" placeholder="Email">
+        <input type="password" id="pass" placeholder="Password">
+        <button class="btn" onclick="authAction('login')">Login</button>
+        <button class="btn btn-sec" onclick="authAction('signup')">Create Account</button>
+        <p id="auth-msg" style="color:#ff5252; margin-top:10px;"></p>
+    </div>
+
+    <div id="screen-app" class="hidden">
+        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #444; padding-bottom:15px;">
+            <span id="user-display">Student</span>
+            <button onclick="logout()" style="color:#ff5252; background:none; border:none; cursor:pointer;">LOGOUT</button>
+        </div>
+
+        <div class="tab-container" style="margin-top:20px;">
+            <button class="btn-tab active" id="btn-pyq" onclick="switchTab('pyq')">🏛️ PYQs</button>
+            <button class="btn-tab" id="btn-chapter" onclick="switchTab('chapter')">📚 Chapter Tests</button>
+            <button class="btn-tab" id="btn-ai" onclick="switchTab('ai')">🤖 AI Redirect</button>
+        </div>
+
+        <div id="tab-pyq"><div id="list-pyq">Loading...</div></div>
+        <div id="tab-chapter" class="hidden"><div id="list-chapter">Loading...</div></div>
+
+        <div id="tab-ai" class="hidden">
+            <h3>🤖 AI Live Examiner</h3>
+            <div style="text-align:left; background:#222; padding:20px; border-radius:10px;">
+                <label>Topic Name</label>
+                <input type="text" id="ai-topic" placeholder="e.g. Thermodynamics...">
+                <button class="btn" style="background:#10a37f;" onclick="startExternalAI('chatgpt')">Start on ChatGPT ↗</button>
+                <button class="btn" style="background:#4b90ff;" onclick="startExternalAI('gemini')">Start on Gemini ↗</button>
+            </div>
+        </div>
+
+        <div id="admin-panel" class="hidden admin-box">
+            <h3 style="color:#ffab00; margin:0;">👑 Admin Upload</h3>
+            <select id="upload-category" style="border:1px solid #ffab00; color:#ffab00; font-weight:bold;">
+                <option value="pyq">🏛️ Save to: PYQ Section</option>
+                <option value="chapter">📚 Save to: Chapter Wise</option>
+            </select>
+            <textarea id="json-input" rows="4" placeholder='[{"text":"Q?", "options":["A","B"], "answer":"A", "exam":"Physics 2023"}]'></textarea>
+            <button class="btn" style="background:#ffab00; color:black;" onclick="uploadQuestions()">Upload</button>
+        </div>
+    </div>
+
+    <div id="screen-manage" class="hidden">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+            <h3 id="manage-title" style="margin:0; color:#ffab00;">Manage Questions</h3>
+            <button onclick="location.reload()" style="background:none; border:none; color:#aaa; cursor:pointer;">✖ Close</button>
+        </div>
+        <p style="color:#777; font-size:0.9em; margin-bottom:20px;">Delete specific questions from this test.</p>
+        <div id="manage-list"></div>
+    </div>
+
+    <div id="screen-quiz" class="hidden">
+        <div style="display:flex; justify-content:space-between;">
+            <span id="q-progress">Q1</span>
+            <button onclick="location.reload()" style="background:none; border:none; color:#aaa;">Exit Test</button>
+        </div>
+        <h3 id="q-text" style="margin:20px 0;">Question?</h3>
+        <div id="options-area"></div>
+        <button class="btn" onclick="submitAnswer()">Next Question ➡</button>
+    </div>
+
+    <div id="screen-result" class="hidden">
+        <h1>🎉 Test Complete!</h1>
+        <h2 style="font-size:3em;">Score: <span id="final-score">0</span></h2>
+        <button class="btn" onclick="location.reload()">Back to Dashboard</button>
+    </div>
+
+</div>
+
+<script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyAAQ6JwJ_1UUV40yNP7VPH-5QsRleL8mQY",
+      authDomain: "exam-challenger-5b22d.firebaseapp.com",
+      projectId: "exam-challenger-5b22d",
+      storageBucket: "exam-challenger-5b22d.firebasestorage.app",
+      messagingSenderId: "490875259715",
+      appId: "1:490875259715:web:497e3bd0dcbfbec4173df6"
+    };
+    
+    const ADMIN_EMAIL = "hrishikeshyadav990@gmail.com"; 
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+    const auth = firebase.auth();
+    const qCol = db.collection("questions");
+
+    let activeQs = [], currIdx = 0, score = 0;
+    let isAdmin = false;
+
+    // --- AUTH ---
+    async function authAction(type) {
+        const e = document.getElementById('email').value;
+        const p = document.getElementById('pass').value;
+        try {
+            if(type === 'login') await auth.signInWithEmailAndPassword(e, p);
+            else { await auth.createUserWithEmailAndPassword(e, p); alert("Created! Login Now."); }
+        } catch(err) { document.getElementById('auth-msg').innerText = err.message; }
+    }
+    function logout() { auth.signOut().then(() => location.reload()); }
+
+    auth.onAuthStateChanged(user => {
+        if(user) {
+            document.getElementById('screen-auth').classList.add('hidden');
+            document.getElementById('screen-app').classList.remove('hidden');
+            
+            if(user.email.toLowerCase() === ADMIN_EMAIL.toLowerCase()) {
+                isAdmin = true;
+                document.getElementById('user-display').innerHTML = `👤 Admin: ${user.email}`;
+                document.getElementById('admin-panel').classList.remove('hidden');
+            } else {
+                isAdmin = false;
+                document.getElementById('user-display').innerText = `👤 Student: ${user.email}`;
+                document.getElementById('admin-panel').classList.add('hidden');
+            }
+            loadTests();
+        }
+    });
+
+    window.switchTab = (tab) => {
+        ['pyq', 'chapter', 'ai'].forEach(t => {
+            document.getElementById('tab-'+t).classList.add('hidden');
+            document.getElementById('btn-'+t).classList.remove('active');
+        });
+        document.getElementById('tab-'+tab).classList.remove('hidden');
+        document.getElementById('btn-'+tab).classList.add('active');
+    }
+
+    // --- LOAD TESTS ---
+    async function loadTests() {
+        document.getElementById('list-pyq').innerHTML = "Loading...";
+        document.getElementById('list-chapter').innerHTML = "Loading...";
+
+        const snap = await qCol.get();
+        // IMPORTANT: We need Document ID to delete single questions
+        const allData = snap.docs.map(d => ({ ...d.data(), id: d.id }));
+
+        const pyqData = allData.filter(q => q.category === 'pyq');
+        const chapterData = allData.filter(q => q.category !== 'pyq');
+
+        renderList(pyqData, 'list-pyq', 'tag-pyq', 'PYQ', allData);
+        renderList(chapterData, 'list-chapter', 'tag-chp', 'CHP', allData);
+    }
+
+    function renderList(data, elementId, tagClass, tagName, allDocs) {
+        const list = document.getElementById(elementId);
+        const exams = [...new Set(data.map(q => q.exam || "General"))];
+        
+        if(exams.length === 0) { list.innerHTML = "<p style='color:#555;'>No tests found here.</p>"; return; }
+
+        list.innerHTML = "";
+        exams.forEach(examName => {
+            const div = document.createElement('div');
+            div.className = 'exam-card';
+            
+            // ADMIN MENU (3 Dots)
+            let menuHtml = "";
+            if(isAdmin) {
+                menuHtml = `
+                    <div style="position:relative;">
+                        <button class="menu-btn" onclick="toggleMenu('${examName.replace(/\s/g,'')}', event)">⋮</button>
+                        <div id="menu-${examName.replace(/\s/g,'')}" class="menu-dropdown">
+                            <div class="menu-item" onclick="openManager('${examName}')">📝 Manage Questions</div>
+                            <div class="menu-item" onclick="deleteFullTest('${examName}')">🗑 Delete Full Test</div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            div.innerHTML = `
+                <div style="flex-grow:1;" onclick="startQuiz('${examName}')">
+                    <small class="${tagClass}">${tagName}</small> 
+                    <span>${examName}</span>
+                </div>
+                ${menuHtml}
+            `;
+            list.appendChild(div);
+        });
+    }
+
+    // --- 3 DOTS LOGIC ---
+    function toggleMenu(id, event) {
+        event.stopPropagation();
+        closeAllMenus();
+        document.getElementById('menu-'+id).style.display = 'block';
+    }
+    function closeAllMenus() {
+        document.querySelectorAll('.menu-dropdown').forEach(m => m.style.display = 'none');
+    }
+
+    // --- 1. DELETE FULL TEST ---
+    async function deleteFullTest(examName) {
+        if(!confirm(`Delete entire test "${examName}"?`)) return;
+        const snap = await qCol.where('exam', '==', examName).get();
+        const batch = db.batch();
+        snap.forEach(doc => batch.delete(doc.ref));
+        await batch.commit();
+        alert("Deleted Test!"); loadTests();
+    }
+
+    // --- 2. MANAGE SINGLE QUESTIONS ---
+    async function openManager(examName) {
+        document.getElementById('screen-app').classList.add('hidden');
+        document.getElementById('screen-manage').classList.remove('hidden');
+        document.getElementById('manage-title').innerText = "Editing: " + examName;
+        
+        const list = document.getElementById('manage-list');
+        list.innerHTML = "Loading questions...";
+
+        const snap = await qCol.where('exam', '==', examName).get();
+        list.innerHTML = "";
+
+        if(snap.empty) {
+            list.innerHTML = "No questions found.";
+            return;
+        }
+
+        snap.forEach(doc => {
+            const q = doc.data();
+            const div = document.createElement('div');
+            div.className = 'q-item';
+            div.innerHTML = `
+                <div class="q-text">${q.text.substring(0, 60)}...</div>
+                <button class="q-del" onclick="deleteSingleQ('${doc.id}')">🗑</button>
+            `;
+            list.appendChild(div);
+        });
+    }
+
+    async function deleteSingleQ(id) {
+        if(!confirm("Delete this specific question?")) return;
+        await qCol.doc(id).delete();
+        // Refresh the manager list (trick: reload same view logic)
+        const currentTitle = document.getElementById('manage-title').innerText.replace("Editing: ", "");
+        openManager(currentTitle);
+    }
+
+    // --- ADMIN UPLOAD ---
+    async function uploadQuestions() {
+        try {
+            const txt = document.getElementById('json-input').value;
+            const category = document.getElementById('upload-category').value;
+            const data = JSON.parse(txt);
+            const arr = Array.isArray(data) ? data : [data];
+            for(let q of arr) {
+                if(!q.exam) q.exam = "New Test";
+                q.category = category;
+                await qCol.add(q);
+            }
+            alert(`Uploaded to ${category.toUpperCase()}!`);
+            location.reload();
+        } catch(e) { alert("Invalid JSON!"); }
+    }
+
+    // --- QUIZ & AI LOGIC (Same as before) ---
+    function startQuiz(name) {
+        // Need to fetch data again or pass it properly. 
+        // For simplicity, re-fetching relevant questions
+        qCol.where('exam', '==', name).get().then(snap => {
+            activeQs = snap.docs.map(d => d.data());
+            currIdx = 0; score = 0;
+            document.getElementById('screen-app').classList.add('hidden');
+            document.getElementById('screen-quiz').classList.remove('hidden');
+            loadQ();
+        });
+    }
+
+    function loadQ() {
+        const q = activeQs[currIdx];
+        document.getElementById('q-progress').innerText = `Q ${currIdx+1} / ${activeQs.length}`;
+        document.getElementById('q-text').innerText = q.text;
+        const area = document.getElementById('options-area');
+        area.innerHTML = "";
+        if(q.options && q.options.length > 0) {
+            q.options.forEach((opt, i) => {
+                const div = document.createElement('div');
+                div.className = 'option';
+                div.innerHTML = `<b>${String.fromCharCode(65+i)}</b>. ${opt}`;
+                div.onclick = () => { document.querySelectorAll('.option').forEach(o => o.classList.remove('selected')); div.classList.add('selected'); };
+                area.appendChild(div);
+            });
+        } else {
+            const inp = document.createElement('input');
+            inp.type = "number"; inp.id = "int-val";
+            area.appendChild(inp);
+        }
+    }
+    window.submitAnswer = () => {
+        const q = activeQs[currIdx];
+        const sel = document.querySelector('.option.selected');
+        const inp = document.getElementById('int-val');
+        let correct = false;
+        if(sel && sel.innerText.includes(q.answer)) correct = true;
+        else if(inp && inp.value == q.answer) correct = true;
+        if(correct) score += 4; else score -= 1;
+        if(currIdx < activeQs.length-1) { currIdx++; loadQ(); }
+        else { document.getElementById('screen-quiz').classList.add('hidden'); document.getElementById('screen-result').classList.remove('hidden'); document.getElementById('final-score').innerText = score; }
+    }
+    function startExternalAI(platform) {
+        const t = document.getElementById('ai-topic').value;
+        const prompt = `Act as JEE Examiner. Test me on: ${t}. Hard level.`;
+        navigator.clipboard.writeText(prompt).then(() => window.open(platform === 'chatgpt' ? "https://chatgpt.com/" : "https://gemini.google.com/app", "_blank"));
+    }
+</script>
+
+</body>
+</html>
